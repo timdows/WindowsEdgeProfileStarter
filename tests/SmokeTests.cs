@@ -1,0 +1,104 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows.Forms;
+
+namespace EdgeProfileStarter
+{
+    internal static class SmokeTests
+    {
+        [STAThread]
+        private static int Main()
+        {
+            try
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                ConfigurationRoundTrip();
+                SynchronizationContext.SetSynchronizationContext(null);
+                BrowserStartup().GetAwaiter().GetResult();
+                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection and cancellation.");
+                return 0;
+            }
+            catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
+
+        private static void Assert(bool condition, string message)
+        {
+            if (!condition) throw new Exception(message);
+        }
+
+        private static void ConfigurationRoundTrip()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "EdgeProfileStarter-test-" + Guid.NewGuid().ToString("N") + ".json");
+            var serializer = new JavaScriptSerializer();
+            var config = new Configuration {
+                windowTitle = "Testvenster", darkMode = false,
+                profiles = new List<Profile> { new Profile { directory = "Default", name = "Werk \"A\" \\ thuis" } }
+            };
+            var values = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(config));
+            values["extra"] = new object[] { "quotes: \" \\ {} []", new Dictionary<string, object>() };
+            try
+            {
+                File.WriteAllText(path, serializer.Serialize(values));
+                var store = new ConfigurationStore(path);
+                store.SetDarkMode(true);
+                Configuration loaded = store.Load();
+                Assert(loaded.darkMode && loaded.profiles[0].name == config.profiles[0].name, "Theme save changed profiles.");
+                Assert(serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(path)).ContainsKey("extra"), "Extra fields lost.");
+                using (var form = new Launcher(store))
+                {
+                    form.Show();
+                    Application.DoEvents();
+                    Assert(form.Text == "Testvenster" && Theme.Dark, "Form failed to load configuration.");
+                    Assert(form.FormBorderStyle == FormBorderStyle.None && !form.MaximizeBox, "Window chrome changed.");
+                    form.Close();
+                } // Closing and disposing again must be safe.
+                foreach (string invalid in new[] { "null", "{}", "{\"profiles\":[]}",
+                    "{\"profiles\":[{\"name\":\"X\",\"directory\":\"../bad\"}]}",
+                    "{\"profiles\":[{\"name\":\"X\",\"directory\":\"Default\"},{\"name\":\"Y\",\"directory\":\"Default\"}]}" })
+                {
+                    File.WriteAllText(path, invalid);
+                    bool rejected = false;
+                    try { store.SetDarkMode(false); }
+                    catch (InvalidDataException) { rejected = true; }
+                    Assert(rejected && File.ReadAllText(path) == invalid, "Invalid configuration was overwritten.");
+                }
+            }
+            finally { if (File.Exists(path)) File.Delete(path); }
+        }
+
+        private static async Task BrowserStartup()
+        {
+            IntPtr oldWindow = new IntPtr(1), newWindow = new IntPtr(2);
+            bool started = false;
+            int attempts = 0;
+            var launcher = new EdgeLauncher(
+                delegate { return started ? new HashSet<IntPtr> { oldWindow, newWindow } : new HashSet<IntPtr> { oldWindow }; },
+                delegate(IntPtr window) { Assert(window == newWindow, "Existing browser window changed."); return ++attempts == 2; },
+                delegate(ProcessStartInfo info) {
+                    Assert(info.Arguments == "--profile-directory=\"Profile 3\" --new-window --start-maximized", "Browser arguments changed.");
+                    started = true;
+                });
+            await launcher.LaunchAsync("test-edge.exe", "Profile 3", CancellationToken.None);
+            Assert(started && attempts == 2, "Did not wait for confirmed maximization.");
+            using (var cancellation = new CancellationTokenSource())
+            {
+                launcher = new EdgeLauncher(delegate { return new HashSet<IntPtr>(); }, delegate { throw new Exception("Unexpected window."); }, delegate { cancellation.Cancel(); });
+                bool cancelled = false;
+                try { await launcher.LaunchAsync("test-edge.exe", "Default", cancellation.Token); }
+                catch (OperationCanceledException) { cancelled = true; }
+                Assert(cancelled, "Closing the launcher did not cancel the wait.");
+            }
+            launcher = new EdgeLauncher(delegate { return new HashSet<IntPtr>(); }, delegate { return false; }, delegate { throw new FileNotFoundException(); });
+            bool failed = false;
+            try { await launcher.LaunchAsync("missing-edge.exe", "Default", CancellationToken.None); }
+            catch (FileNotFoundException) { failed = true; }
+            Assert(failed, "Process startup errors were swallowed.");
+        }
+    }
+}
