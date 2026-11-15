@@ -19,9 +19,10 @@ namespace EdgeProfileStarter
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 ConfigurationRoundTrip();
+                RdpStartup();
                 SynchronizationContext.SetSynchronizationContext(null);
                 BrowserStartup().GetAwaiter().GetResult();
-                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection and cancellation.");
+                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP connections.");
                 return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
@@ -38,7 +39,8 @@ namespace EdgeProfileStarter
             var serializer = new JavaScriptSerializer();
             var config = new Configuration {
                 windowTitle = "Testvenster", darkMode = false,
-                profiles = new List<Profile> { new Profile { directory = "Default", name = "Werk \"A\" \\ thuis" } }
+                profiles = new List<Profile> { new Profile { directory = "Default", name = "Werk \"A\" \\ thuis" } },
+                rdpSessions = new List<RdpSession> { new RdpSession { name = "Server", host = "server.example:3390" } }
             };
             var values = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(config));
             values["extra"] = new object[] { "quotes: \" \\ {} []", new Dictionary<string, object>() };
@@ -72,6 +74,31 @@ namespace EdgeProfileStarter
             finally { if (File.Exists(path)) File.Delete(path); }
         }
 
+        private static void RdpStartup()
+        {
+            ProcessStartInfo command = null;
+            int calls = 0;
+            var launcher = new RdpLauncher(delegate(ProcessStartInfo info) { command = info; calls++; });
+            foreach (string host in new[] { "server.example", "192.168.1.20:3390", "[2001:db8::1]:3389" })
+            {
+                launcher.Launch(new RdpSession { name = "Server", host = host });
+                Assert(command != null && Path.GetFileName(command.FileName) == "mstsc.exe", "RDP must start mstsc.");
+                Assert(command.Arguments == "/v:" + host && command.UseShellExecute, "RDP must connect directly to the configured host.");
+            }
+            int previousCalls = calls;
+            foreach (string host in new[] { "bad\r\n/v:other", "", "server /admin", "server\"name", "server\\path", "server/name" })
+            {
+                bool rejected = false;
+                try { launcher.Launch(new RdpSession { name = "Bad", host = host }); }
+                catch (InvalidDataException) { rejected = true; }
+                Assert(rejected, "Unsafe RDP host accepted.");
+            }
+            Assert(calls == previousCalls, "Invalid host started a process.");
+            // An old username field must not prevent existing configurations from loading.
+            var session = new JavaScriptSerializer().Deserialize<RdpSession>("{\"name\":\"Old\",\"host\":\"server\",\"username\":\"ignored\"}");
+            launcher.Launch(session);
+            Assert(command.Arguments == "/v:server", "Legacy username affected direct startup.");
+        }
         private static async Task BrowserStartup()
         {
             IntPtr oldWindow = new IntPtr(1), newWindow = new IntPtr(2);

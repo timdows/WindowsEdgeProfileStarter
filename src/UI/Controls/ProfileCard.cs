@@ -14,15 +14,18 @@ namespace EdgeProfileStarter
         private bool hovered;
         private bool pressed;
         internal ProfileCard(string name, string directory, bool exists, int index)
+            : this(name, directory + (exists ? "" : "  ·  Niet gevonden"), index, false) { }
+
+        internal ProfileCard(string name, string detail, int index, bool remote)
         {
             title = name;
-            subtitle = directory + (exists ? "" : "  ·  Niet gevonden");
+            subtitle = detail;
             Text = name;
             AccessibleName = name + ", " + subtitle;
-            AccessibleDescription = "Open Microsoft Edge met dit profiel";
+            AccessibleDescription = remote ? "Open deze RDP-sessie" : "Open Microsoft Edge met dit profiel";
             Color[] colors = { Color.FromArgb(85, 120, 225), Color.FromArgb(29, 157, 143), Color.FromArgb(160, 104, 211) };
             accent = colors[index % colors.Length];
-            symbol = index % 3;
+            symbol = remote ? 3 : index % 3;
             Cursor = Cursors.Hand;
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
@@ -79,13 +82,17 @@ namespace EdgeProfileStarter
                     g.DrawRectangle(pen, 21, 15, 10, 6);
                     g.DrawLine(pen, 14, 28, 38, 28);
                     g.DrawLine(pen, 26, 26, 26, 31);
-                } else {
+                } else if (symbol == 2) {
                     g.DrawLine(pen, 14, 19, 24, 19);
                     g.DrawLine(pen, 24, 19, 28, 23);
                     g.DrawLine(pen, 28, 23, 38, 23);
                     g.DrawLine(pen, 38, 23, 38, 37);
                     g.DrawLine(pen, 38, 37, 14, 37);
                     g.DrawLine(pen, 14, 37, 14, 19);
+                } else {
+                    g.DrawRectangle(pen, 13, 15, 26, 19);
+                    g.DrawLine(pen, 26, 34, 26, 40);
+                    g.DrawLine(pen, 19, 40, 33, 40);
                 }
             }
             g.ResetTransform();

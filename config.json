@@ -2,8 +2,18 @@
   "windowTitle": "Mijn Edge-profielen",
   "darkMode": false,
   "profiles": [
-    { "directory": "Default", "name": "Persoonlijk" },
-    { "directory": "Profile 1", "name": "Werk" },
-    { "directory": "Profile 3", "name": "Projecten" }
-  ]
+    {
+      "directory": "Default",
+      "name": "Persoonlijk"
+    },
+    {
+      "directory": "Profile 1",
+      "name": "Werk"
+    },
+    {
+      "directory": "Profile 3",
+      "name": "Projecten"
+    }
+  ],
+  "rdpSessions": []
 }

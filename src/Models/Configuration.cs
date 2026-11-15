@@ -7,5 +7,6 @@ namespace EdgeProfileStarter
         public bool darkMode { get; set; }
         public string windowTitle { get; set; }
         public List<Profile> profiles { get; set; }
+        public List<RdpSession> rdpSessions { get; set; }
     }
 }

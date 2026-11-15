@@ -40,10 +40,26 @@ Open `dist\config.json` in een teksteditor, pas de namen aan en sla het bestand 
 
 Bij opnieuw bouwen blijft de configuratie in `dist` behouden. Het bestand in de hoofdmap is alleen het voorbeeld voor een eerste build. De launcher opent altijd een nieuw, gemaximaliseerd Edge-venster voor het gekozen profiel via `--new-window --start-maximized` en een expliciete Windows-maximaliseeropdracht. Bestaande Edge-vensters worden niet aangepast. Als binnen 15 seconden geen nieuw gemaximaliseerd venster gevonden wordt, blijft de launcher open met een foutmelding.
 
+## RDP-sessies
+
+De rechterkolom opent Remote Desktop-verbindingen rechtstreeks met `mstsc.exe /v:host`. Voeg in dezelfde `config.json` een lijst `rdpSessions` toe naast `profiles`:
+
+```json
+"rdpSessions": [
+  { "name": "Werkserver", "host": "server.example.local" },
+  { "name": "Testomgeving", "host": "192.168.1.20:3390" }
+]
+```
+
+Gebruik een komma tussen `profiles` en `rdpSessions`. De host kan een naam of IP-adres zijn, eventueel met poortnummer. Start de launcher opnieuw na wijzigingen. Bestaande configuraties zonder `rdpSessions` blijven werken en tonen een lege RDP-kolom.
+
+De launcher blijft open na het starten van een verbinding. Windows beheert de gebruikersnaam en aanmeldgegevens. Je kunt die bij het verbinden invoeren en, waar toegestaan, laten onthouden door Windows. De launcher maakt geen `.rdp`-bestanden en bewaart geen gebruikersnamen of wachtwoorden.
+
 ## Code-indeling
 
 - `src/Models`: de configuratie en profielgegevens.
 - `src/Services/ConfigurationStore.cs`: laden, valideren en atomisch opslaan van `config.json`.
+- `src/Services/RdpLauncher.cs`: rechtstreeks mstsc starten met het ingestelde hostadres.
 - `src/Services/EdgeLauncher.cs`: Edge starten en wachten op een gemaximaliseerd venster.
 - `src/Services/SingleInstanceApplication.cs`: één actief appvenster en activeren bij opnieuw starten.
 - `src/Windows`: Windows-vensters detecteren en maximaliseren.

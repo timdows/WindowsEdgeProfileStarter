@@ -15,8 +15,10 @@ namespace EdgeProfileStarter
         private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
         private readonly ConfigurationStore configuration;
         private readonly EdgeLauncher edge = new EdgeLauncher();
+        private readonly RdpLauncher rdp = new RdpLauncher();
         private readonly CancellationTokenSource shutdown = new CancellationTokenSource();
         private readonly FlowLayoutPanel profiles = new FlowLayoutPanel();
+        private readonly FlowLayoutPanel rdpSessions = new FlowLayoutPanel();
         private readonly Button themeToggle = new QuietButton();
         private bool launching;
         private bool resourcesDisposed;
@@ -35,8 +37,8 @@ namespace EdgeProfileStarter
                 Icon = (Icon)icon.Clone();
             Font = new Font("Segoe UI", 10);
             BackColor = Color.FromArgb(246, 248, 252);
-            ClientSize = new Size(540, 520);
-            MinimumSize = new Size(460, 420);
+            ClientSize = new Size(980, 520);
+            MinimumSize = new Size(820, 420);
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Dpi;
 
@@ -50,7 +52,9 @@ namespace EdgeProfileStarter
             TableLayoutPanel layout = new GradientLayout();
             layout.Dock = DockStyle.Fill;
             layout.Padding = new Padding(32, 12, 32, 20);
-            layout.ColumnCount = 1;
+            layout.ColumnCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             layout.RowCount = 3;
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
@@ -58,17 +62,25 @@ namespace EdgeProfileStarter
             Controls.Add(layout);
             Control heading = new HeroHeader { Dock = DockStyle.Fill };
             layout.Controls.Add(heading, 0, 0);
+            layout.SetColumnSpan(heading, 2);
             layout.Controls.Add(new Label { Text = "JOUW PROFIELEN", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = Color.FromArgb(119, 131, 153), BackColor = Color.Transparent, Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) }, 0, 1);
-            profiles.Dock = DockStyle.Fill;
-            profiles.FlowDirection = FlowDirection.TopDown;
-            profiles.WrapContents = false;
-            profiles.AutoScroll = true;
-            profiles.BackColor = Color.Transparent;
-            profiles.Margin = new Padding(0);
-            profiles.SizeChanged += delegate { ResizeButtons(); };
+            layout.Controls.Add(new Label { Text = "RDP-SESSIES", Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.Transparent, Dock = DockStyle.Fill, Padding = new Padding(12, 4, 0, 0) }, 1, 1);
+            ConfigureList(profiles, new Padding(0, 0, 12, 0));
+            ConfigureList(rdpSessions, new Padding(12, 0, 0, 0));
             layout.Controls.Add(profiles, 0, 2);
+            layout.Controls.Add(rdpSessions, 1, 2);
         }
 
+        private void ConfigureList(FlowLayoutPanel list, Padding margin)
+        {
+            list.Dock = DockStyle.Fill;
+            list.FlowDirection = FlowDirection.TopDown;
+            list.WrapContents = false;
+            list.AutoScroll = true;
+            list.BackColor = Color.Transparent;
+            list.Margin = margin;
+            list.SizeChanged += delegate { ResizeButtons(); };
+        }
         private void BuildTitleBar()
         {
             Panel titleBar = new Panel { Height = 44, Dock = DockStyle.Top, BackColor = Color.FromArgb(237, 243, 255) };
@@ -121,8 +133,9 @@ namespace EdgeProfileStarter
 
         private void ResizeButtons()
         {
-            foreach (Control control in profiles.Controls)
-                control.Width = Math.Max(200, profiles.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 8);
+            foreach (FlowLayoutPanel list in new[] { profiles, rdpSessions })
+                foreach (Control control in list.Controls)
+                    control.Width = Math.Max(180, list.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 8);
         }
 
         private void LoadProfiles()
@@ -143,6 +156,23 @@ namespace EdgeProfileStarter
                     button.Click += delegate { Launch(selected); };
                     profiles.Controls.Add(button);
                 }
+                while (rdpSessions.Controls.Count > 0) rdpSessions.Controls[0].Dispose();
+                index = 0;
+                if (config.rdpSessions != null)
+                    foreach (RdpSession session in config.rdpSessions)
+                    {
+                        RdpSession selected = session;
+                        Button button = new ProfileCard(selected.name, selected.host, index++, true);
+                        button.Height = 96;
+                        button.Margin = new Padding(0, 0, 0, 12);
+                        button.Click += delegate {
+                            try { rdp.Launch(selected); }
+                            catch (Exception error) { ShowError("RDP kon niet worden gestart. " + error.Message); }
+                        };
+                        rdpSessions.Controls.Add(button);
+                    }
+                if (rdpSessions.Controls.Count == 0)
+                    rdpSessions.Controls.Add(new Label { Text = "Voeg RDP-sessies toe in config.json.", Height = 64, Padding = new Padding(4, 16, 0, 0), BackColor = Color.Transparent });
                 ResizeButtons();
                 Theme.Dark = config.darkMode;
                 ApplyTheme();
