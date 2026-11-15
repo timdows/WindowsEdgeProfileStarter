@@ -4,6 +4,8 @@ Een kleine Windows desktop-app om Microsoft Edge met een bestaand profiel te ope
 
 ![Edge Profile Starter in donkere modus](docs/screenshot.png)
 
+De screenshot toont de vorige versie; de rechterkolom heet nu **Verbindingen** en ondersteunt ook UltraVNC.
+
 Het venster heeft een eigen titelbalk met minimaliseren en sluiten. Versleep het via de bovenste strook. Maximaliseren is uitgeschakeld. Het eigen app-icoon is ingebouwd in de exe; de bronbestanden staan in `assets`. Met `generate-icon.ps1` kun je het icoon opnieuw genereren.
 
 De launcher opent een nieuw Edge-venster en maximaliseert dit via Windows. De launcher blijft open, zodat je gedurende de dag opnieuw een profiel kunt kiezen. Er kan per Windows-gebruiker en sessie één launcher actief zijn, ook als je de exe vanuit verschillende mappen opent. Opnieuw starten brengt het bestaande venster naar voren en herstelt het als het geminimaliseerd is.
@@ -42,7 +44,7 @@ Bij opnieuw bouwen blijft de configuratie in `dist` behouden. Het bestand in de 
 
 ## RDP-sessies
 
-De rechterkolom opent Remote Desktop-verbindingen rechtstreeks met `mstsc.exe /v:host`. Voeg in dezelfde `config.json` een lijst `rdpSessions` toe naast `profiles`:
+In de rechterkolom **Verbindingen** staan RDP- en UltraVNC-sessies samen. De RDP-knoppen openen Remote Desktop-verbindingen rechtstreeks met `mstsc.exe /v:host`. Voeg in dezelfde `config.json` een lijst `rdpSessions` toe naast `profiles`:
 
 ```json
 "rdpSessions": [
@@ -51,14 +53,40 @@ De rechterkolom opent Remote Desktop-verbindingen rechtstreeks met `mstsc.exe /v
 ]
 ```
 
-Gebruik een komma tussen `profiles` en `rdpSessions`. De host kan een naam of IP-adres zijn, eventueel met poortnummer. Start de launcher opnieuw na wijzigingen. Bestaande configuraties zonder `rdpSessions` blijven werken en tonen een lege RDP-kolom.
+Gebruik een komma tussen `profiles` en `rdpSessions`. De host kan een naam of IP-adres zijn, eventueel met poortnummer. Start de launcher opnieuw na wijzigingen. Bestaande configuraties zonder `rdpSessions` blijven werken.
 
 De launcher blijft open na het starten van een verbinding. Windows beheert de gebruikersnaam en aanmeldgegevens. Je kunt die bij het verbinden invoeren en, waar toegestaan, laten onthouden door Windows. De launcher maakt geen `.rdp`-bestanden en bewaart geen gebruikersnamen of wachtwoorden.
 
+## UltraVNC
+
+Installeer UltraVNC Viewer of gebruik een portable `vncviewer.exe`. Voeg naast `rdpSessions` de volgende velden toe aan `config.json`:
+
+```json
+"vncSessions": [
+  { "name": "Werkstation", "host": "pc.example.local", "username": "DOMEIN\\tim" },
+  { "name": "VNC testserver", "host": "192.168.1.30::5901" }
+],
+"ultraVncViewerPath": ""
+```
+
+Per UltraVNC-host kun je optioneel `username` instellen. De launcher geeft die mee als `-user "gebruikersnaam"`. Ontbreekt het veld of is het leeg, dan wordt `-user` weggelaten. Dit is bedoeld voor MS-Logon; de UltraVNC-server moet die authenticatiemethode ondersteunen. Een domeinnaam schrijf je in JSON als `"username": "DOMEIN\\tim"`. Wachtwoorden blijven buiten de configuratie.
+
+De host volgt de UltraVNC-notatie: `host` voor de standaardverbinding, `host:1` voor display 1 en `host::5901` voor een expliciet poortnummer. Elke knop toont `UltraVNC` of `RDP` naast de host. De launcher blijft open.
+
+Bij een leeg `ultraVncViewerPath` zoekt de app onder Program Files in `uvnc bvba\UltraVNC`, `uvnc\UltraVNC` en `UltraVNC`, daarna naast de launcher en in PATH. Voor een andere locatie stel je het volledige pad in, bijvoorbeeld:
+
+```json
+"ultraVncViewerPath": "C:\\Tools\\UltraVNC\\vncviewer.exe"
+```
+
+Relatieve paden worden ten opzichte van de exe opgelost. Omgevingsvariabelen zoals `%ProgramFiles%` zijn toegestaan. Als de viewer niet gevonden wordt, toont de app een melding bij het aanklikken; Edge en RDP blijven bruikbaar.
+
+De app start de viewer rechtstreeks met `vncviewer.exe -connect host`. Authenticatie verloopt via UltraVNC Viewer; de launcher bewaart geen wachtwoord. Er worden geen verbindingsbestanden aangemaakt. Zie de [officiële UltraVNC-commandoregelopties](https://uvnc.com/docs/ultravnc-viewer/52-ultravnc-viewer-commandline-parameters.html).
 ## Code-indeling
 
 - `src/Models`: de configuratie en profielgegevens.
 - `src/Services/ConfigurationStore.cs`: laden, valideren en atomisch opslaan van `config.json`.
+- `src/Services/VncLauncher.cs`: UltraVNC Viewer vinden en een verbinding starten.
 - `src/Services/RdpLauncher.cs`: rechtstreeks mstsc starten met het ingestelde hostadres.
 - `src/Services/EdgeLauncher.cs`: Edge starten en wachten op een gemaximaliseerd venster.
 - `src/Services/SingleInstanceApplication.cs`: één actief appvenster en activeren bij opnieuw starten.

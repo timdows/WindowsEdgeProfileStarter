@@ -20,9 +20,10 @@ namespace EdgeProfileStarter
                 Application.SetCompatibleTextRenderingDefault(false);
                 ConfigurationRoundTrip();
                 RdpStartup();
+                VncStartup();
                 SynchronizationContext.SetSynchronizationContext(null);
                 BrowserStartup().GetAwaiter().GetResult();
-                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP connections.");
+                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP/UltraVNC connections.");
                 return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
@@ -40,7 +41,9 @@ namespace EdgeProfileStarter
             var config = new Configuration {
                 windowTitle = "Testvenster", darkMode = false,
                 profiles = new List<Profile> { new Profile { directory = "Default", name = "Werk \"A\" \\ thuis" } },
-                rdpSessions = new List<RdpSession> { new RdpSession { name = "Server", host = "server.example:3390" } }
+                rdpSessions = new List<RdpSession> { new RdpSession { name = "Server", host = "server.example:3390" } },
+                vncSessions = new List<VncSession> { new VncSession { name = "VNC server", host = "vnc.example::5901", username = @"DOMEIN\tim" } },
+                ultraVncViewerPath = @"C:\Tools\UltraVNC\vncviewer.exe"
             };
             var values = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(config));
             values["extra"] = new object[] { "quotes: \" \\ {} []", new Dictionary<string, object>() };
@@ -51,6 +54,7 @@ namespace EdgeProfileStarter
                 store.SetDarkMode(true);
                 Configuration loaded = store.Load();
                 Assert(loaded.darkMode && loaded.profiles[0].name == config.profiles[0].name, "Theme save changed profiles.");
+                Assert(loaded.vncSessions.Count == 1 && loaded.vncSessions[0].host == "vnc.example::5901" && loaded.ultraVncViewerPath == config.ultraVncViewerPath && loaded.vncSessions[0].username == @"DOMEIN\tim", "Theme save changed VNC configuration.");
                 Assert(serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(path)).ContainsKey("extra"), "Extra fields lost.");
                 using (var form = new Launcher(store))
                 {
@@ -98,6 +102,55 @@ namespace EdgeProfileStarter
             var session = new JavaScriptSerializer().Deserialize<RdpSession>("{\"name\":\"Old\",\"host\":\"server\",\"username\":\"ignored\"}");
             launcher.Launch(session);
             Assert(command.Arguments == "/v:server", "Legacy username affected direct startup.");
+        }
+        private static void VncStartup()
+        {
+            string file = Path.Combine(Path.GetTempPath(), "UltraVNC test " + Guid.NewGuid().ToString("N") + ".exe");
+            File.WriteAllText(file, "test placeholder; never executed");
+            ProcessStartInfo command = null;
+            int calls = 0;
+            var launcher = new VncLauncher(delegate(ProcessStartInfo info) { command = info; calls++; });
+            try
+            {
+                foreach (string host in new[] { "server.example", "192.168.1.20::5901", "server:1" })
+                {
+                    launcher.Launch(new VncSession { name = "Server", host = host }, file);
+                    Assert(command.FileName == file && command.Arguments == "-connect " + host, "UltraVNC command changed.");
+                    Assert(command.UseShellExecute && command.WorkingDirectory == Path.GetDirectoryName(file), "Viewer launch directory lost.");
+                }
+                foreach (string username in new[] { @"DOMEIN\tim", "tim@example.com", "Tim Example", "account\\" })
+                {
+                    launcher.Launch(new VncSession { name = "Server", host = "server", username = username }, file);
+                    string quoted = "\"" + username + (username.EndsWith("\\") ? "\\" : "") + "\"";
+                    Assert(command.Arguments == "-connect server -user " + quoted, "VNC username was not passed as one argument.");
+                }
+                foreach (string username in new[] { "", "   ", null })
+                {
+                    launcher.Launch(new VncSession { name = "Server", host = "server", username = username }, file);
+                    Assert(command.Arguments == "-connect server", "Empty VNC username should be omitted.");
+                }
+                foreach (string username in new[] { "bad\r\n-user other", "bad\" -listen", "bad\0name" })
+                {
+                    int before = calls;
+                    bool rejected = false;
+                    try { launcher.Launch(new VncSession { name = "Server", host = "server", username = username }, file); }
+                    catch (InvalidDataException) { rejected = true; }
+                    Assert(rejected && calls == before, "Invalid VNC username started a process.");
+                }
+                int previous = calls;
+                foreach (string host in new[] { "", "bad\n-connect other", "server -listen", "-listen", "server\"name", "server/path" })
+                {
+                    bool rejected = false;
+                    try { launcher.Launch(new VncSession { name = "Bad", host = host }, file); }
+                    catch (InvalidDataException) { rejected = true; }
+                    Assert(rejected, "Unsafe VNC host accepted.");
+                }
+                bool missing = false;
+                try { launcher.Launch(new VncSession { name = "Server", host = "server" }, file + ".missing"); }
+                catch (FileNotFoundException) { missing = true; }
+                Assert(missing && calls == previous, "Missing viewer or invalid host started a process.");
+            }
+            finally { File.Delete(file); }
         }
         private static async Task BrowserStartup()
         {

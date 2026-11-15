@@ -15,5 +15,7 @@
       "name": "Projecten"
     }
   ],
-  "rdpSessions": []
+  "rdpSessions": [],
+  "vncSessions": [],
+  "ultraVncViewerPath": ""
 }

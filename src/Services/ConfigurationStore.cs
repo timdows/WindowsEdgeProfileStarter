@@ -38,6 +38,8 @@ namespace EdgeProfileStarter
                 throw new InvalidDataException("Voeg minimaal één profiel toe aan config.json.");
             if (config.rdpSessions != null)
                 foreach (RdpSession session in config.rdpSessions) RdpLauncher.Validate(session);
+            if (config.vncSessions != null)
+                foreach (VncSession session in config.vncSessions) VncLauncher.Validate(session);
             var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (Profile profile in config.profiles)
             {

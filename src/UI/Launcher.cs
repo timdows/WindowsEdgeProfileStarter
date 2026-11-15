@@ -16,9 +16,10 @@ namespace EdgeProfileStarter
         private readonly ConfigurationStore configuration;
         private readonly EdgeLauncher edge = new EdgeLauncher();
         private readonly RdpLauncher rdp = new RdpLauncher();
+        private readonly VncLauncher vnc = new VncLauncher();
         private readonly CancellationTokenSource shutdown = new CancellationTokenSource();
         private readonly FlowLayoutPanel profiles = new FlowLayoutPanel();
-        private readonly FlowLayoutPanel rdpSessions = new FlowLayoutPanel();
+        private readonly FlowLayoutPanel connections = new FlowLayoutPanel();
         private readonly Button themeToggle = new QuietButton();
         private bool launching;
         private bool resourcesDisposed;
@@ -64,11 +65,11 @@ namespace EdgeProfileStarter
             layout.Controls.Add(heading, 0, 0);
             layout.SetColumnSpan(heading, 2);
             layout.Controls.Add(new Label { Text = "JOUW PROFIELEN", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = Color.FromArgb(119, 131, 153), BackColor = Color.Transparent, Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) }, 0, 1);
-            layout.Controls.Add(new Label { Text = "RDP-SESSIES", Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.Transparent, Dock = DockStyle.Fill, Padding = new Padding(12, 4, 0, 0) }, 1, 1);
+            layout.Controls.Add(new Label { Text = "VERBINDINGEN", Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.Transparent, Dock = DockStyle.Fill, Padding = new Padding(12, 4, 0, 0) }, 1, 1);
             ConfigureList(profiles, new Padding(0, 0, 12, 0));
-            ConfigureList(rdpSessions, new Padding(12, 0, 0, 0));
+            ConfigureList(connections, new Padding(12, 0, 0, 0));
             layout.Controls.Add(profiles, 0, 2);
-            layout.Controls.Add(rdpSessions, 1, 2);
+            layout.Controls.Add(connections, 1, 2);
         }
 
         private void ConfigureList(FlowLayoutPanel list, Padding margin)
@@ -133,7 +134,7 @@ namespace EdgeProfileStarter
 
         private void ResizeButtons()
         {
-            foreach (FlowLayoutPanel list in new[] { profiles, rdpSessions })
+            foreach (FlowLayoutPanel list in new[] { profiles, connections })
                 foreach (Control control in list.Controls)
                     control.Width = Math.Max(180, list.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 8);
         }
@@ -156,23 +157,37 @@ namespace EdgeProfileStarter
                     button.Click += delegate { Launch(selected); };
                     profiles.Controls.Add(button);
                 }
-                while (rdpSessions.Controls.Count > 0) rdpSessions.Controls[0].Dispose();
+                while (connections.Controls.Count > 0) connections.Controls[0].Dispose();
                 index = 0;
                 if (config.rdpSessions != null)
                     foreach (RdpSession session in config.rdpSessions)
                     {
                         RdpSession selected = session;
-                        Button button = new ProfileCard(selected.name, selected.host, index++, true);
+                        Button button = new ProfileCard(selected.name, "RDP  ·  " + selected.host, index++, true);
                         button.Height = 96;
                         button.Margin = new Padding(0, 0, 0, 12);
                         button.Click += delegate {
                             try { rdp.Launch(selected); }
                             catch (Exception error) { ShowError("RDP kon niet worden gestart. " + error.Message); }
                         };
-                        rdpSessions.Controls.Add(button);
+                        connections.Controls.Add(button);
                     }
-                if (rdpSessions.Controls.Count == 0)
-                    rdpSessions.Controls.Add(new Label { Text = "Voeg RDP-sessies toe in config.json.", Height = 64, Padding = new Padding(4, 16, 0, 0), BackColor = Color.Transparent });
+                if (config.vncSessions != null)
+                    foreach (VncSession session in config.vncSessions)
+                    {
+                        VncSession selected = session;
+                        Button button = new ProfileCard(selected.name, "UltraVNC  ·  " + selected.host, index++, true);
+                        button.Height = 96;
+                        button.Margin = new Padding(0, 0, 0, 12);
+                        button.AccessibleDescription = "Open deze UltraVNC-verbinding";
+                        button.Click += delegate {
+                            try { vnc.Launch(selected, config.ultraVncViewerPath); }
+                            catch (Exception error) { ShowError("UltraVNC kon niet worden gestart. " + error.Message); }
+                        };
+                        connections.Controls.Add(button);
+                    }
+                if (connections.Controls.Count == 0)
+                    connections.Controls.Add(new Label { Text = "Voeg RDP- of UltraVNC-sessies toe in config.json.", Height = 64, Padding = new Padding(4, 16, 0, 0), BackColor = Color.Transparent });
                 ResizeButtons();
                 Theme.Dark = config.darkMode;
                 ApplyTheme();
