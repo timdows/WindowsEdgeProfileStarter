@@ -4,7 +4,7 @@ Een kleine Windows desktop-app om Microsoft Edge met een bestaand profiel te ope
 
 ![Edge Profile Starter in donkere modus](docs/screenshot.png)
 
-De screenshot toont voorbeeldhosts voor RDP en UltraVNC met de weergavekeuze per verbinding.
+De screenshot toont voorbeeldverbindingen voor RDP en SSH en een share-knop.
 
 Het venster heeft een eigen titelbalk met minimaliseren en sluiten. Versleep het via de bovenste strook. Maximaliseren is uitgeschakeld. Het eigen app-icoon is ingebouwd in de exe; de bronbestanden staan in `assets`. Met `generate-icon.ps1` kun je het icoon opnieuw genereren.
 
@@ -95,10 +95,38 @@ Onder elke RDP- en UltraVNC-kaart kies je vóór het verbinden **Volledig scherm
 Bij UltraVNC verandert de keuze de lokale viewer, niet de resolutie of monitorindeling van de externe computer. Eventuele opgeslagen UltraVNC-standaardinstellingen worden door de viewer met commandoregelopties gecombineerd en kunnen het resultaat beïnvloeden. De RDP-server moet meerdere monitoren ondersteunen voor de optie Alle schermen.
 
 Bronnen: [mstsc-opties](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc), [UltraVNC-opties](https://uvnc.com/docs/ultravnc-viewer/52-ultravnc-viewer-commandline-parameters.html), [UltraVNC-optieverwerking](https://github.com/ultravnc/UltraVNC/blob/main/vncviewer/VNCOptions.cpp).
+## Shares openen
+
+Shares staan in dezelfde kolom **Verbindingen**, met een mapicoon. Klik op een share om die in Windows Verkenner te openen. Voeg naast `profiles`, `rdpSessions` en `vncSessions` de volgende lijst toe aan `config.json`:
+
+```json
+"shares": [
+  { "name": "FTP", "path": "\\\\192.168.1.253\\ftp" },
+  { "name": "Team", "path": "\\\\fileserver\\Team Files" }
+]
+```
+
+Een normaal Windows-pad is `\\192.168.1.253\ftp`; in JSON moeten backslashes dubbel geschreven worden. Onderliggende mappen en spaties zijn toegestaan. Start de launcher opnieuw na een configuratiewijziging. Windows regelt de netwerkaanmelding en toegang; de launcher slaat hiervoor geen gebruikersnaam of wachtwoord op. De app controleert de netwerklocatie niet vooraf, zodat onbereikbare servers het laden van de launcher niet vertragen. Er is geen beeldschermkeuze nodig voor shares.
+## SSH
+
+SSH-verbindingen staan met een terminalicoon onder **Verbindingen**. Voeg in `config.json` een lijst toe:
+
+```json
+"sshSessions": [
+  { "name": "Linux-server", "host": "192.168.1.40", "username": "admin", "port": 22 },
+  { "name": "SSH-config alias", "host": "my-server" }
+]
+```
+
+`username` en `port` zijn optioneel. Zonder die velden gebruikt SSH de eigen standaardinstellingen of je SSH-configuratie. Een poort moet tussen 1 en 65535 liggen; zet de poort in `port`, niet achter de hostnaam. IPv6-adressen zijn toegestaan. De launcher start rechtstreeks Windows `System32\OpenSSH\ssh.exe` in een interactieve console, zonder een `cmd`- of PowerShell-tussenstap. Daar kun je eventuele hostkeyvragen beantwoorden en je wachtwoord of sleutelwachtwoord invoeren. De launcher blijft open en slaat geen wachtwoorden op.
+
+Windows **OpenSSH Client** moet geïnstalleerd zijn. Als die ontbreekt, toont de launcher een melding; installeer dan OpenSSH Client via de optionele Windows-onderdelen. Start de launcher opnieuw na het aanpassen van de configuratie. SSH-knoppen hebben geen beeldschermkeuze nodig.
 ## Code-indeling
 
 - `src/Models`: de configuratie en profielgegevens.
 - `src/Services/ConfigurationStore.cs`: laden, valideren en atomisch opslaan van `config.json`.
+- `src/Services/SshLauncher.cs`: Windows SSH starten in een interactieve console.
+- `src/Services/ShareLauncher.cs`: UNC-shares openen met Windows Verkenner.
 - `src/Services/VncLauncher.cs`: UltraVNC Viewer vinden en een verbinding starten.
 - `src/Services/RdpLauncher.cs`: rechtstreeks mstsc starten met het ingestelde hostadres.
 - `src/Services/EdgeLauncher.cs`: Edge starten en wachten op een gemaximaliseerd venster.

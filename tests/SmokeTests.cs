@@ -22,9 +22,11 @@ namespace EdgeProfileStarter
                 RdpStartup();
                 VncStartup();
                 DisplayModes();
+                ShareStartup();
+                SshStartup();
                 SynchronizationContext.SetSynchronizationContext(null);
                 BrowserStartup().GetAwaiter().GetResult();
-                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP/UltraVNC connections.");
+                Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP/UltraVNC/share/SSH connections.");
                 return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
@@ -44,7 +46,9 @@ namespace EdgeProfileStarter
                 profiles = new List<Profile> { new Profile { directory = "Default", name = "Werk \"A\" \\ thuis" } },
                 rdpSessions = new List<RdpSession> { new RdpSession { name = "Server", host = "server.example:3390" } },
                 vncSessions = new List<VncSession> { new VncSession { name = "VNC server", host = "vnc.example::5901", username = @"DOMEIN\tim" } },
-                ultraVncViewerPath = @"C:\Tools\UltraVNC\vncviewer.exe"
+                ultraVncViewerPath = @"C:\Tools\UltraVNC\vncviewer.exe",
+                shares = new List<NetworkShare> { new NetworkShare { name = "FTP", path = @"\\192.168.1.253\ftp" } },
+                sshSessions = new List<SshSession> { new SshSession { name = "Linux", host = "linux.example", username = "admin", port = 2222 } }
             };
             var values = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(config));
             values["extra"] = new object[] { "quotes: \" \\ {} []", new Dictionary<string, object>() };
@@ -56,6 +60,8 @@ namespace EdgeProfileStarter
                 Configuration loaded = store.Load();
                 Assert(loaded.darkMode && loaded.profiles[0].name == config.profiles[0].name, "Theme save changed profiles.");
                 Assert(loaded.vncSessions.Count == 1 && loaded.vncSessions[0].host == "vnc.example::5901" && loaded.ultraVncViewerPath == config.ultraVncViewerPath && loaded.vncSessions[0].username == @"DOMEIN\tim", "Theme save changed VNC configuration.");
+                Assert(loaded.shares.Count == 1 && loaded.shares[0].path == @"\\192.168.1.253\ftp", "Theme save changed shares.");
+                Assert(loaded.sshSessions.Count == 1 && loaded.sshSessions[0].username == "admin" && loaded.sshSessions[0].port == 2222, "Theme save changed SSH configuration.");
                 Assert(serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(path)).ContainsKey("extra"), "Extra fields lost.");
                 using (var form = new Launcher(store))
                 {
@@ -203,6 +209,62 @@ namespace EdgeProfileStarter
                 if (result != null) return result;
             }
             return null;
+        }
+        private static void ShareStartup()
+        {
+            ProcessStartInfo command = null;
+            int calls = 0;
+            var launcher = new ShareLauncher(delegate(ProcessStartInfo info) { command = info; calls++; });
+            foreach (string path in new[] { @"\\192.168.1.253\ftp", @"\\server\Team Files\Sub Folder", @"\\server\share\", @"\\server\C$" })
+            {
+                launcher.Launch(new NetworkShare { name = "Share", path = path });
+                Assert(Path.GetFileName(command.FileName) == "explorer.exe" && command.UseShellExecute, "Share must open Explorer.");
+                Assert(command.Arguments == "\"" + path.TrimEnd('\\') + "\"", "UNC path must be one correctly quoted argument.");
+            }
+            int previous = calls;
+            foreach (string path in new[] { "", @"C:\folder", @"\server\share", @"\\\server\share", @"\\server", @"\\.\C$", @"\\?\C:\folder", "\\\\server\\share\r\n", "\\\\server\\share\" /select", @"\\server\share\..\other", "https://example.com" })
+            {
+                bool rejected = false;
+                try { launcher.Launch(new NetworkShare { name = "Bad", path = path }); }
+                catch (InvalidDataException) { rejected = true; }
+                Assert(rejected, "Invalid share accepted.");
+            }
+            Assert(calls == previous, "Invalid share started Explorer.");
+        }
+        private static void SshStartup()
+        {
+            ProcessStartInfo command = null;
+            int calls = 0;
+            var launcher = new SshLauncher(delegate(ProcessStartInfo info) { command = info; calls++; }, delegate { return @"C:\Windows\System32\OpenSSH\ssh.exe"; });
+            launcher.Launch(new SshSession { name = "Linux", host = "linux.example", username = "admin", port = 2222 });
+            Assert(command.Arguments == "-p 2222 -l \"admin\" -- \"linux.example\"", "SSH arguments changed.");
+            Assert(command.FileName == @"C:\Windows\System32\OpenSSH\ssh.exe" && command.UseShellExecute && !command.CreateNoWindow, "SSH must open an interactive Windows SSH console.");
+            launcher.Launch(new SshSession { name = "Default", host = "my-ssh-alias" });
+            Assert(command.Arguments == "-- \"my-ssh-alias\"", "Optional SSH fields must be omitted for SSH config defaults.");
+            launcher.Launch(new SshSession { name = "IPv6", host = "2001:db8::1", username = @"DOMAIN\tim" });
+            Assert(command.Arguments == "-l \"DOMAIN\\tim\" -- \"2001:db8::1\"", "IPv6 or domain username lost.");
+            int before = calls;
+            foreach (var invalid in new[] {
+                new SshSession { name = "Bad", host = "-oProxyCommand=bad" },
+                new SshSession { name = "Bad", host = "server command" },
+                new SshSession { name = "Bad", host = "server\"" },
+                new SshSession { name = "Bad", host = "user@server" },
+                new SshSession { name = "Bad", host = "server", port = 0 },
+                new SshSession { name = "Bad", host = "server", port = 65536 },
+                new SshSession { name = "Bad", host = "server", username = "user\r\nother" }
+            })
+            {
+                bool rejected = false;
+                try { launcher.Launch(invalid); }
+                catch (InvalidDataException) { rejected = true; }
+                Assert(rejected, "Invalid SSH session accepted.");
+            }
+            Assert(calls == before, "Invalid SSH input started a process.");
+            bool missing = false;
+            launcher = new SshLauncher(delegate { throw new Exception("Must not start."); }, delegate { throw new FileNotFoundException(); });
+            try { launcher.Launch(new SshSession { name = "Missing client", host = "server" }); }
+            catch (FileNotFoundException) { missing = true; }
+            Assert(missing, "Missing Windows SSH client error lost.");
         }
         private static async Task BrowserStartup()
         {

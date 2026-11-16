@@ -17,6 +17,8 @@ namespace EdgeProfileStarter
         private readonly EdgeLauncher edge = new EdgeLauncher();
         private readonly RdpLauncher rdp = new RdpLauncher();
         private readonly VncLauncher vnc = new VncLauncher();
+        private readonly ShareLauncher shareLauncher = new ShareLauncher();
+        private readonly SshLauncher ssh = new SshLauncher();
         private readonly CancellationTokenSource shutdown = new CancellationTokenSource();
         private readonly FlowLayoutPanel profiles = new FlowLayoutPanel();
         private readonly FlowLayoutPanel connections = new FlowLayoutPanel();
@@ -179,8 +181,36 @@ namespace EdgeProfileStarter
                         });
                         connections.Controls.Add(button);
                     }
+                if (config.sshSessions != null)
+                    foreach (SshSession session in config.sshSessions)
+                    {
+                        SshSession selected = session;
+                        string target = (String.IsNullOrWhiteSpace(selected.username) ? "" : selected.username + "@") + selected.host;
+                        if (selected.port.HasValue) target += "  ·  poort " + selected.port.Value;
+                        var button = new ProfileCard(selected.name, "SSH  ·  " + target, index++, false, false, true) {
+                            Height = 96, Margin = new Padding(0, 0, 0, 14), AccessibleDescription = "Open deze SSH-verbinding"
+                        };
+                        button.Click += delegate {
+                            try { ssh.Launch(selected); }
+                            catch (Exception error) { ShowError("SSH kon niet worden gestart. " + error.Message); }
+                        };
+                        connections.Controls.Add(button);
+                    }
+                if (config.shares != null)
+                    foreach (NetworkShare share in config.shares)
+                    {
+                        NetworkShare selected = share;
+                        var button = new ProfileCard(selected.name, "Share  ·  " + selected.path, index++, false, true) {
+                            Height = 96, Margin = new Padding(0, 0, 0, 14), AccessibleDescription = "Open deze share in Windows Verkenner"
+                        };
+                        button.Click += delegate {
+                            try { shareLauncher.Launch(selected); }
+                            catch (Exception error) { ShowError("De share kon niet worden geopend. " + error.Message); }
+                        };
+                        connections.Controls.Add(button);
+                    }
                 if (connections.Controls.Count == 0)
-                    connections.Controls.Add(new Label { Text = "Voeg RDP- of UltraVNC-sessies toe in config.json.", Height = 64, Padding = new Padding(4, 16, 0, 0), BackColor = Color.Transparent });
+                    connections.Controls.Add(new Label { Text = "Voeg verbindingen of shares toe in config.json.", Height = 64, Padding = new Padding(4, 16, 0, 0), BackColor = Color.Transparent });
                 ResizeButtons();
                 Theme.Dark = config.darkMode;
                 ApplyTheme();

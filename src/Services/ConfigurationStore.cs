@@ -40,6 +40,10 @@ namespace EdgeProfileStarter
                 foreach (RdpSession session in config.rdpSessions) RdpLauncher.Validate(session);
             if (config.vncSessions != null)
                 foreach (VncSession session in config.vncSessions) VncLauncher.Validate(session);
+            if (config.shares != null)
+                foreach (NetworkShare share in config.shares) ShareLauncher.Validate(share);
+            if (config.sshSessions != null)
+                foreach (SshSession session in config.sshSessions) SshLauncher.Validate(session);
             var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (Profile profile in config.profiles)
             {

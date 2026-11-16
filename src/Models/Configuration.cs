@@ -10,5 +10,7 @@ namespace EdgeProfileStarter
         public List<RdpSession> rdpSessions { get; set; }
         public List<VncSession> vncSessions { get; set; }
         public string ultraVncViewerPath { get; set; }
+        public List<NetworkShare> shares { get; set; }
+        public List<SshSession> sshSessions { get; set; }
     }
 }

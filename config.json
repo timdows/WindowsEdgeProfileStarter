@@ -17,5 +17,12 @@
   ],
   "rdpSessions": [],
   "vncSessions": [],
-  "ultraVncViewerPath": ""
+  "ultraVncViewerPath": "",
+  "shares": [
+    {
+      "name": "FTP",
+      "path": "\\\\192.168.1.253\\ftp"
+    }
+  ],
+  "sshSessions": []
 }
