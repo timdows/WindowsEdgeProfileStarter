@@ -4,7 +4,7 @@ Een kleine Windows desktop-app om Microsoft Edge met een bestaand profiel te ope
 
 ![Edge Profile Starter in donkere modus](docs/screenshot.png)
 
-De screenshot toont de vorige versie; de rechterkolom heet nu **Verbindingen** en ondersteunt ook UltraVNC.
+De screenshot toont voorbeeldhosts voor RDP en UltraVNC met de weergavekeuze per verbinding.
 
 Het venster heeft een eigen titelbalk met minimaliseren en sluiten. Versleep het via de bovenste strook. Maximaliseren is uitgeschakeld. Het eigen app-icoon is ingebouwd in de exe; de bronbestanden staan in `assets`. Met `generate-icon.ps1` kun je het icoon opnieuw genereren.
 
@@ -82,6 +82,19 @@ Bij een leeg `ultraVncViewerPath` zoekt de app onder Program Files in `uvnc bvba
 Relatieve paden worden ten opzichte van de exe opgelost. Omgevingsvariabelen zoals `%ProgramFiles%` zijn toegestaan. Als de viewer niet gevonden wordt, toont de app een melding bij het aanklikken; Edge en RDP blijven bruikbaar.
 
 De app start de viewer rechtstreeks met `vncviewer.exe -connect host`. Authenticatie verloopt via UltraVNC Viewer; de launcher bewaart geen wachtwoord. Er worden geen verbindingsbestanden aangemaakt. Zie de [officiële UltraVNC-commandoregelopties](https://uvnc.com/docs/ultravnc-viewer/52-ultravnc-viewer-commandline-parameters.html).
+## Weergave kiezen
+
+Onder elke RDP- en UltraVNC-kaart kies je vóór het verbinden **Volledig scherm**, **Alle schermen** of **1280 × 1024**. Klik daarna op de kaart. Elke verbinding heeft een eigen keuze, standaard Volledig scherm; de keuze blijft tijdens het gebruik van de launcher beschikbaar en wordt bij herstart teruggezet.
+
+| Keuze | RDP | UltraVNC |
+| --- | --- | --- |
+| Volledig scherm | `/f` | `-fullscreen -autoscaling` |
+| Alle schermen | `/f /multimon`, met de lokale monitorindeling | Randloos viewer-venster over de volledige lokale desktop via `-noborder -notoolbar -autoscaling -position x y w h` |
+| 1280 × 1024 | `/w:1280 /h:1024` | Viewer-venster via `-autoscaling -position 0 0 1280 1024` |
+
+Bij UltraVNC verandert de keuze de lokale viewer, niet de resolutie of monitorindeling van de externe computer. Eventuele opgeslagen UltraVNC-standaardinstellingen worden door de viewer met commandoregelopties gecombineerd en kunnen het resultaat beïnvloeden. De RDP-server moet meerdere monitoren ondersteunen voor de optie Alle schermen.
+
+Bronnen: [mstsc-opties](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mstsc), [UltraVNC-opties](https://uvnc.com/docs/ultravnc-viewer/52-ultravnc-viewer-commandline-parameters.html), [UltraVNC-optieverwerking](https://github.com/ultravnc/UltraVNC/blob/main/vncviewer/VNCOptions.cpp).
 ## Code-indeling
 
 - `src/Models`: de configuratie en profielgegevens.

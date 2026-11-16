@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Forms;
 
 namespace EdgeProfileStarter
 {
@@ -25,7 +26,7 @@ namespace EdgeProfileStarter
                         throw new InvalidDataException("De UltraVNC-gebruikersnaam mag geen besturingstekens of dubbele aanhalingstekens bevatten.");
         }
 
-        internal void Launch(VncSession session, string viewerPath)
+        internal void Launch(VncSession session, string viewerPath, DisplayMode mode = DisplayMode.Default)
         {
             Validate(session);
             string executable = FindViewer(viewerPath);
@@ -38,6 +39,7 @@ namespace EdgeProfileStarter
                 int trailing = value.Length - value.TrimEnd('\\').Length;
                 arguments += " -user \"" + value + new string('\\', trailing) + "\"";
             }
+            arguments += DisplayOptions.ForVnc(mode, SystemInformation.VirtualScreen);
             start(new ProcessStartInfo(executable, arguments) {
                 UseShellExecute = true,
                 WorkingDirectory = Path.GetDirectoryName(executable)

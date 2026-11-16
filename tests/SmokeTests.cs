@@ -21,6 +21,7 @@ namespace EdgeProfileStarter
                 ConfigurationRoundTrip();
                 RdpStartup();
                 VncStartup();
+                DisplayModes();
                 SynchronizationContext.SetSynchronizationContext(null);
                 BrowserStartup().GetAwaiter().GetResult();
                 Console.WriteLine("OK: configuration, validation, theme persistence, form lifecycle, browser window selection, cancellation and RDP/UltraVNC connections.");
@@ -151,6 +152,57 @@ namespace EdgeProfileStarter
                 Assert(missing && calls == previous, "Missing viewer or invalid host started a process.");
             }
             finally { File.Delete(file); }
+        }
+        private static void DisplayModes()
+        {
+            ProcessStartInfo command = null;
+            var rdp = new RdpLauncher(delegate(ProcessStartInfo info) { command = info; });
+            var session = new RdpSession { name = "RDP", host = "server:3390" };
+            var modes = new[] { DisplayMode.FullScreen, DisplayMode.AllMonitors, DisplayMode.Window1280 };
+            var expected = new[] { " /f", " /f /multimon", " /w:1280 /h:1024" };
+            for (int i = 0; i < modes.Length; i++)
+            {
+                rdp.Launch(session, modes[i]);
+                Assert(command.Arguments == "/v:server:3390" + expected[i], "RDP display mode not passed.");
+            }
+            Assert(DisplayOptions.ForVnc(DisplayMode.AllMonitors, new System.Drawing.Rectangle(-1920, -1080, 3840, 2160)) == " -noborder -notoolbar -autoscaling -position -1920 -1080 3840 2160", "Multi-screen coordinates lost.");
+            string file = Path.Combine(Path.GetTempPath(), "VNC-display-test-" + Guid.NewGuid().ToString("N") + ".exe");
+            File.WriteAllText(file, "test placeholder; never executed");
+            try
+            {
+                var vnc = new VncLauncher(delegate(ProcessStartInfo info) { command = info; });
+                foreach (DisplayMode mode in modes)
+                {
+                    vnc.Launch(new VncSession { name = "VNC", host = "server", username = @"DOMAIN\tim" }, file, mode);
+                    Assert(command.Arguments == "-connect server -user \"DOMAIN\\tim\"" + DisplayOptions.ForVnc(mode, SystemInformation.VirtualScreen), "VNC display mode or username lost.");
+                }
+            }
+            finally { File.Delete(file); }
+            DisplayMode selected = DisplayMode.Default;
+            using (var card = new ConnectionCard("Test", "RDP", 0, "Test", delegate(DisplayMode mode) { selected = mode; }))
+            {
+                card.CreateControl();
+                ComboBox combo = FindControl<ComboBox>(card);
+                Button button = FindControl<Button>(card);
+                for (int i = 0; i < modes.Length; i++)
+                {
+                    combo.SelectedIndex = i;
+                    button.PerformClick();
+                    Assert(selected == modes[i], "Frontend selection not used at launch.");
+                }
+            }
+        }
+
+        private static T FindControl<T>(Control parent) where T : Control
+        {
+            foreach (Control child in parent.Controls)
+            {
+                T result = child as T;
+                if (result != null) return result;
+                result = FindControl<T>(child);
+                if (result != null) return result;
+            }
+            return null;
         }
         private static async Task BrowserStartup()
         {

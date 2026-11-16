@@ -38,8 +38,8 @@ namespace EdgeProfileStarter
                 Icon = (Icon)icon.Clone();
             Font = new Font("Segoe UI", 10);
             BackColor = Color.FromArgb(246, 248, 252);
-            ClientSize = new Size(980, 520);
-            MinimumSize = new Size(820, 420);
+            ClientSize = new Size(980, 670);
+            MinimumSize = new Size(820, 480);
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Dpi;
 
@@ -163,27 +163,20 @@ namespace EdgeProfileStarter
                     foreach (RdpSession session in config.rdpSessions)
                     {
                         RdpSession selected = session;
-                        Button button = new ProfileCard(selected.name, "RDP  ·  " + selected.host, index++, true);
-                        button.Height = 96;
-                        button.Margin = new Padding(0, 0, 0, 12);
-                        button.Click += delegate {
-                            try { rdp.Launch(selected); }
+                        var button = new ConnectionCard(selected.name, "RDP  ·  " + selected.host, index++, "Open deze RDP-verbinding", delegate(DisplayMode mode) {
+                            try { rdp.Launch(selected, mode); }
                             catch (Exception error) { ShowError("RDP kon niet worden gestart. " + error.Message); }
-                        };
+                        });
                         connections.Controls.Add(button);
                     }
                 if (config.vncSessions != null)
                     foreach (VncSession session in config.vncSessions)
                     {
                         VncSession selected = session;
-                        Button button = new ProfileCard(selected.name, "UltraVNC  ·  " + selected.host, index++, true);
-                        button.Height = 96;
-                        button.Margin = new Padding(0, 0, 0, 12);
-                        button.AccessibleDescription = "Open deze UltraVNC-verbinding";
-                        button.Click += delegate {
-                            try { vnc.Launch(selected, config.ultraVncViewerPath); }
+                        var button = new ConnectionCard(selected.name, "UltraVNC  ·  " + selected.host, index++, "Open deze UltraVNC-verbinding", delegate(DisplayMode mode) {
+                            try { vnc.Launch(selected, config.ultraVncViewerPath, mode); }
                             catch (Exception error) { ShowError("UltraVNC kon niet worden gestart. " + error.Message); }
-                        };
+                        });
                         connections.Controls.Add(button);
                     }
                 if (connections.Controls.Count == 0)

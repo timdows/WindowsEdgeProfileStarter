@@ -12,8 +12,13 @@ namespace EdgeProfileStarter
         internal static Color Muted { get { return Dark ? Color.FromArgb(158, 174, 200) : Color.FromArgb(112, 125, 148); } }
         internal static void Apply(Control control)
         {
-            if (control is Form || (control is Panel && !(control is FlowLayoutPanel))) control.BackColor = Top;
+            if (control is Form || (control is Panel && !(control is FlowLayoutPanel) && control.BackColor != Color.Transparent)) control.BackColor = Top;
             if (control is Label) control.ForeColor = Muted;
+            ComboBox combo = control as ComboBox;
+            if (combo != null) {
+                combo.BackColor = Dark ? Color.FromArgb(37, 46, 66) : Color.FromArgb(237, 242, 250);
+                combo.ForeColor = Text;
+            }
             Button button = control as Button;
             if (button != null && !(button is ProfileCard))
             {

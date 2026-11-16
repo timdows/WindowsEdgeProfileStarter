@@ -20,11 +20,11 @@ namespace EdgeProfileStarter
                     throw new InvalidDataException("Ongeldige RDP-host: gebruik een hostnaam of IP-adres, eventueel met poort.");
         }
 
-        internal void Launch(RdpSession session)
+        internal void Launch(RdpSession session, DisplayMode mode = DisplayMode.Default)
         {
             Validate(session);
             string executable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "mstsc.exe");
-            start(new ProcessStartInfo(executable, "/v:" + session.host) { UseShellExecute = true });
+            start(new ProcessStartInfo(executable, "/v:" + session.host + DisplayOptions.ForRdp(mode)) { UseShellExecute = true });
         }
 
         private static void StartProcess(ProcessStartInfo info)
